@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.nn import LogSoftmax
+from torch.nn import LogSoftmax,Softmax
 from torch.optim import AdamW
 from torch.distributions import Categorical
 
@@ -22,6 +22,19 @@ class DiscreteStateAgent(nn.Module):
             state_idx (int): the integer id for the state
         """
         return self.logsoftmax(self.params(state_idx))
+
+    def snapshot(self,use_softmax=True):
+        """
+        Returns a numpy matrix with a copy of the weights
+
+        KwArgs:
+            use_softmax (bool): if true, the returned weights are softmaxed rowwise 
+        """
+        W = self.params.weight.detach()
+        if use_softmax:     
+            softmax = nn.Softmax(dim=0)
+            return softmax(W).numpy()        
+        return W.numpy()
 
 
 
@@ -82,22 +95,24 @@ class SignallingGame:
         return loss,reward
             
 
-    def sample_game(self,niter=100,ntrajectories=16):
+    def sample_game(self,niter=200,ntrajectories=16):
         """
         Trains a reinforcement model 
         """
         optim_fnc = AdamW( list(self.alice.parameters()) + list(self.bob.parameters()),lr=0.1)
 
-        history = {'alice',[],'bob':[],'reward':[]}
+        history = []
+
         for step in range(niter):
             optim_fnc.zero_grad()
             loss,reward = self.sample_episode(ntrajectories)
             loss.backward()
             print('loss',loss.item())
             optim_fnc.step()
-            history['alice'].append(alice.params.weight)
-            history['bob'].append(bob.params.weight)
-            history['reward'].append(reward)
+
+
+            history.append({'alice':self.alice.snapshot(),'bob':self.bob.snapshot(),'reward':reward})
+
 
         return history
 
@@ -106,10 +121,18 @@ class SignallingGame:
 
 
 
+if __name__ == '__main__':
+    import numpy as np
+    import matplotlib.pyplot as plt    
+    import visualize as V
 
+    Alice = DiscreteStateAgent(3,3)
+    Bob   = DiscreteStateAgent(3,3)
 
-Alice = DiscreteStateAgent(3,3)
-Bob   = DiscreteStateAgent(3,3)
+    G = SignallingGame(3,Alice,Bob)
+    H = G.sample_game()
+    V.plot_alice_strategies(H,normalize=False)
+    V.plot_bob_strategies(H,normalize=False)
+    V.plot_reward(H)
 
-G = SignallingGame(3,Alice,Bob)
-G.sample_game()
+    plt.show()
