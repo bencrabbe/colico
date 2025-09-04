@@ -4,7 +4,9 @@ from torch.nn import LogSoftmax,Softmax
 from torch.optim import AdamW
 from torch.distributions import Categorical
 
-
+"""
+This is an implementation of a signalling game with standard torch implementation.
+"""
 class DiscreteStateAgent(nn.Module):
     """
     An agent performing actions given discrete states
